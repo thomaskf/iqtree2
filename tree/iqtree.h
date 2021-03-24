@@ -718,6 +718,11 @@ public:
     void initCandidateTreeSet(int nParTrees, int nNNITrees);
 
     /**
+     * load the initial tree from the input stream
+     */
+    void readUserTree(LikelihoodKernel kernel, istream &in);
+
+    /**
      * Generate the initial tree (usually used for model parameter estimation)
      */
     void computeInitialTree(LikelihoodKernel kernel);

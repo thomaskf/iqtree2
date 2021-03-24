@@ -92,7 +92,17 @@ public:
 	 */
 	virtual bool isMixture() { return false; }
 
-    /** 
+    /**
+     * @return TRUE if this is a tree-mixture model, FALSE otherwise
+     */
+    virtual bool isTreeMixture() { return false; }
+    
+    /**
+     * @return the i-th model if this is a tree-mixture model, itself otherwise
+     */
+    virtual ModelSubst* getModel(int i) { return this; }
+
+    /**
      * Confer to modelpomo.h.
      * 
      * @return TRUE if PoMo is being used, FALSE otherise.

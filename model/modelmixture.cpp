@@ -1244,11 +1244,11 @@ void ModelMixture::initMixture(string orig_model_name, string model_name, string
 		if (freq == FREQ_MIXTURE) {
 			for(int f = 0; f != freq_vec.size(); f++) {
                 if (freq_vec[f] == nxs_freq_empirical)
-					model = (ModelMarkov*)createModel(this_name, models_block, FREQ_EMPIRICAL, "", tree);
+					model = (ModelMarkov*)createModel(this_name, models_block, FREQ_EMPIRICAL, "", getTree(m));
                 else if (freq_vec[f] == nxs_freq_optimize)
-					model = (ModelMarkov*)createModel(this_name, models_block, FREQ_ESTIMATE, "", tree);
+					model = (ModelMarkov*)createModel(this_name, models_block, FREQ_ESTIMATE, "", getTree(m));
 				else
-					model = (ModelMarkov*)createModel(this_name, models_block, FREQ_USER_DEFINED, freq_vec[f]->description, tree);
+					model = (ModelMarkov*)createModel(this_name, models_block, FREQ_USER_DEFINED, freq_vec[f]->description, getTree(m));
 				model->total_num_subst = rate * freq_rates[f];
 				push_back(model);
 				weights.push_back(weight * freq_weights[f]);
@@ -1270,7 +1270,7 @@ void ModelMixture::initMixture(string orig_model_name, string model_name, string
 				full_name += model->name;
 			}
 		} else {
-			model = (ModelMarkov*)createModel(this_name, models_block, freq, freq_params, tree);
+			model = (ModelMarkov*)createModel(this_name, models_block, freq, freq_params, getTree(m));
 			model->total_num_subst = rate;
 			push_back(model);
 			weights.push_back(weight);
@@ -1573,6 +1573,7 @@ double ModelMixture::targetFunk(double x[]) {
 }
 
 double ModelMixture::optimizeWeights() {
+    cout << "ModelMixture::optimizeWeights()" << endl << flush;
     // first compute _pattern_lh_cat
     phylo_tree->computePatternLhCat(WSL_MIXTURE);
     size_t ptn, c;
@@ -1646,6 +1647,7 @@ double ModelMixture::optimizeWeights() {
 }
 
 double ModelMixture::optimizeWithEM(double gradient_epsilon) {
+    cout << "ModelMixture::optimizeWithEM()" << endl << flush;
     size_t ptn, c;
     size_t nptn = phylo_tree->aln->getNPattern();
     size_t nmix = size();
@@ -1804,6 +1806,7 @@ bool ModelMixture::isFused() {
 }
 
 double ModelMixture::optimizeParameters(double gradient_epsilon) {
+    cout << "ModelMixture::optimizeParameters()" << endl << flush;
 	optimizing_submodels = true;
 
     int dim = getNDim();

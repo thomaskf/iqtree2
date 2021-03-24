@@ -31,6 +31,7 @@
 #include "modelpomo.h"
 #include "modelset.h"
 #include "modelmixture.h"
+#include "modeltreemixture.h"
 #include "ratemeyerhaeseler.h"
 #include "ratemeyerdiscrete.h"
 #include "ratekategory.h"
@@ -192,6 +193,13 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
     if (new_model_str != model_str)
         cout << "Model " << model_str << " is alias for " << new_model_str << endl;
     model_str = new_model_str;
+        
+    // check whether it is a tree-mixture model
+    bool isTreeMixture = false;
+    if (model_str.length() > 2 && model_str.substr(model_str.length()-2, 2)=="+T") {
+        isTreeMixture = true;
+        model_str = model_str.substr(0, model_str.length()-2);
+    }
 
     //    nxsmodel = models_block->findModel(model_str);
     //    if (nxsmodel && nxsmodel->description.find_first_of("+*") != string::npos) {
@@ -533,7 +541,11 @@ ModelFactory::ModelFactory(Params &params, string &model_name, PhyloTree *tree, 
                 model_list = model_str.substr(4, model_str.length()-5);
                 model_str = model_str.substr(0, 3);
             }
-            model = new ModelMixture(model_name, model_str, model_list, models_block, freq_type, freq_params, tree, optimize_mixmodel_weight);
+            if (isTreeMixture) {
+                model = new ModelTreeMixture(model_name, model_str, model_list, models_block, freq_type, freq_params, (IQTreeMix*)tree, optimize_mixmodel_weight);
+            } else {
+                model = new ModelMixture(model_name, model_str, model_list, models_block, freq_type, freq_params, tree, optimize_mixmodel_weight);
+            }
         } else {
             //            string model_desc;
             //            NxsModel *nxsmodel = models_block->findModel(model_str);
@@ -968,6 +980,7 @@ double ModelFactory::initGTRGammaIParameters(RateHeterogeneity *rate, ModelSubst
 
 double ModelFactory::optimizeParametersOnly(int num_steps, double gradient_epsilon, double cur_logl) {
     double logl;
+    cout << "[ModelFactory::optimizeParametersOnly] begins *" << endl << flush;
     /* Optimize substitution and heterogeneity rates independently */
     if (!joint_optimize) {
         // more steps for fused mix rate model
@@ -999,6 +1012,7 @@ double ModelFactory::optimizeParametersOnly(int num_steps, double gradient_epsil
         /* Optimize substitution and heterogeneity rates jointly using BFGS */
         logl = optimizeAllParameters(gradient_epsilon);
     }
+    cout << "[ModelFactory::optimizeParametersOnly] ends *" << endl << flush;
     return logl;
 }
 
@@ -1051,8 +1065,10 @@ double ModelFactory::optimizeAllParameters(double gradient_epsilon) {
 }
 
 double ModelFactory::optimizeParametersGammaInvar(int fixed_len, bool write_info, double logl_epsilon, double gradient_epsilon) {
-    if (!site_rate->isGammai() || site_rate->isFixPInvar() || site_rate->isFixGammaShape() || site_rate->getTree()->aln->frac_const_sites == 0.0 || model->isMixture())
+    if (!site_rate->isGammai() || site_rate->isFixPInvar() || site_rate->isFixGammaShape() || site_rate->getTree()->aln->frac_const_sites == 0.0 || model->isMixture()) {
+        cout << "[ModelFactory::optimizeParametersGammaInvar()] call optimizeParameters()" << endl << flush;
         return optimizeParameters(fixed_len, write_info, logl_epsilon, gradient_epsilon);
+    }
 
     double begin_time = getRealTime();
 
@@ -1254,7 +1270,7 @@ double ModelFactory::optimizeParameters(int fixed_len, bool write_info,
     ASSERT(tree);
 
     stopStoringTransMatrix();
-    // modified by Thomas Wong on Sept 11, 15
+
     // no optimization of branch length in the first round
     double optimizeStartTime = getRealTime();
     cur_lh = tree->computeLikelihood();
@@ -1267,10 +1283,10 @@ double ModelFactory::optimizeParameters(int fixed_len, bool write_info,
 
     // PRINT Log-Likelihood
     if (verbose_mode >= VB_MED) {
-        cout << "1. Initial log-likelihood: " << cur_lh << " (took " <<
+        cout << "[ModelFactory::optimizeParameters] 1. Initial log-likelihood: " << cur_lh << " (took " <<
         (getRealTime() - optimizeStartTime) << " wall-clock sec)" << endl;
     } else {
-        cout << "1. Initial log-likelihood: " << cur_lh << endl;
+        cout << "[ModelFactory::optimizeParameters] 1. Initial log-likelihood: " << cur_lh << endl;
     }
         
     // RESTORE previous precision
@@ -1296,7 +1312,10 @@ double ModelFactory::optimizeParameters(int fixed_len, bool write_info,
     for (i = 2; i < tree->params->num_param_iterations; i++) {
         double new_lh;
 
-        // changed to opimise edge length first, and then Q,W,R inside the loop by Thomas on Sept 11, 15
+        if (model->isTreeMixture()) {
+            new_lh = optimizeParametersOnly(i, gradient_epsilon, new_lh);
+        }
+
         if (fixed_len == BRLEN_OPTIMIZE)
             new_lh = tree->optimizeAllBranches(min(i,3), logl_epsilon);  // loop only 3 times in total (previously in v0.9.6 5 times)
         else if (fixed_len == BRLEN_SCALE) {
@@ -1305,8 +1324,10 @@ double ModelFactory::optimizeParameters(int fixed_len, bool write_info,
         } else
             new_lh = cur_lh;
 
-        new_lh = optimizeParametersOnly(i, gradient_epsilon, new_lh);
-
+        if (!model->isTreeMixture()) {
+            new_lh = optimizeParametersOnly(i, gradient_epsilon, new_lh);
+        }
+        
         if (new_lh == 0.0) {
             if (fixed_len == BRLEN_OPTIMIZE)
                 cur_lh = tree->optimizeAllBranches(tree->params->num_param_iterations, logl_epsilon);
@@ -1335,9 +1356,9 @@ double ModelFactory::optimizeParameters(int fixed_len, bool write_info,
             }
         } else {
             site_rate->classifyRates(new_lh);
-            if (fixed_len == BRLEN_OPTIMIZE)
+            if (fixed_len == BRLEN_OPTIMIZE) {
                 cur_lh = tree->optimizeAllBranches(100, logl_epsilon);
-            else if (fixed_len == BRLEN_SCALE) {
+            } else if (fixed_len == BRLEN_SCALE) {
                 double scaling = 1.0;
                 cur_lh = tree->optimizeTreeLengthScaling(MIN_BRLEN_SCALE, scaling, MAX_BRLEN_SCALE, gradient_epsilon);
             }
@@ -1373,7 +1394,8 @@ double ModelFactory::optimizeParameters(int fixed_len, bool write_info,
 
     if (verbose_mode <= VB_MIN && write_info) {
         model->writeInfo(cout);
-        site_rate->writeInfo(cout);
+        if (!model->isTreeMixture())
+            site_rate->writeInfo(cout);
         if (fixed_len == BRLEN_SCALE)
             cout << "Scaled tree length: " << tree->treeLength() << endl;
     }
@@ -1387,6 +1409,11 @@ double ModelFactory::optimizeParameters(int fixed_len, bool write_info,
     // ---------------------------
 
     tree->setCurScore(cur_lh);
+    
+    // show the tree
+    if (model->isTreeMixture()) {
+        ((IQTreeMix*)tree)->showTree();
+    }
     return cur_lh;
 }
 

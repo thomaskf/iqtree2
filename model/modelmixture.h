@@ -87,7 +87,6 @@ public:
 	 */
 	virtual bool isMixture() { return true; }
 
-
 	/**
 	 * @return the number of mixture model components
 	 */
@@ -246,6 +245,21 @@ public:
     	for (iterator it = begin(); it != end(); it++)
     		mem += (*it)->getMemoryRequired();
     	return mem;
+    }
+    
+    /**
+     * @return the i-th model
+     */
+    virtual ModelSubst * getModel(int i) {return at(i);}
+
+    /**
+     * @return the corresponding tree for the i-th model
+     * For this model mixture, it should return the same tree.
+     * For tree-mixture model, which inherits this class,
+     * it will return different tree for different model
+     */
+    virtual PhyloTree* getTree(int i) {
+        return phylo_tree;
     }
 
 	/**

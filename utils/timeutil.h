@@ -77,12 +77,14 @@
 	}
 	#else /* UNIX */
 	#include <sys/time.h>
+/*
 	__inline void gettimeofday(struct timeval* t, void* timezone) {
 		time_t cur_time;
 		time(&cur_time);
 		t->tv_sec = cur_time;
 		t->tv_usec = 0;
 	}
+ */
 	#endif
 #endif /* HAVE_GETTIMEOFDAY */
 

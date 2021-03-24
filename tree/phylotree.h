@@ -348,6 +348,7 @@ class PhyloTree : public MTree, public Optimization, public CheckpointFactory {
 	friend class RateGammaInvar;
 	friend class RateKategory;
     friend class ModelMixture;
+    friend class ModelTreeMixture;
     friend class RateFree;
     friend class RateHeterotachy;
     friend class PhyloTreeMixlen;

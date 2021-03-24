@@ -48,6 +48,7 @@ ModelFactoryMixlen::ModelFactoryMixlen(Params &params, string &model_name, Phylo
 
 double ModelFactoryMixlen::optimizeParameters(int fixed_len, bool write_info, double logl_epsilon, double gradient_epsilon) {
 
+    cout << "[ModelFactoryMixlen::optimizeParameters] begins" << endl;
 	PhyloTreeMixlen *tree = (PhyloTreeMixlen*)site_rate->getTree();
 	ASSERT(tree);
     

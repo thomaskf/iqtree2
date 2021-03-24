@@ -1109,6 +1109,8 @@ void ModelMarkov::setBounds(double *lower_bound, double *upper_bound, bool *boun
 
 double ModelMarkov::optimizeParameters(double gradient_epsilon) {
     
+    cout << "[ModelMarkov::optimizeParameters] begins" << endl;
+    
     if (fixed_parameters) {
         return 0.0;
     }

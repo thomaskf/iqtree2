@@ -33,6 +33,7 @@
 #include "alignment/superalignment.h"
 #include "alignment/superalignmentunlinked.h"
 #include "tree/iqtree.h"
+#include "tree/iqtreemix.h"
 #include "tree/phylotreemixlen.h"
 #include "model/modelmarkov.h"
 #include "model/modeldna.h"
@@ -2180,6 +2181,11 @@ void optimizeConTree(Params &params, IQTree *tree) {
     tree->getCheckpoint()->put("contree", contree);
 }
 
+// check whether it is tree-mixture model
+bool isTreeMixture(Params& params) {
+    return (params.model_name.length() > 2 && params.model_name.substr(params.model_name.length()-2,2)=="+T");
+}
+
 void runTreeReconstruction(Params &params, IQTree* &iqtree) {
 
     //    string dist_file;
@@ -2221,6 +2227,17 @@ void runTreeReconstruction(Params &params, IQTree* &iqtree) {
     ModelsBlock *models_block = readModelsDefinition(params);
 
     initializeParams(params, *iqtree);
+    
+    if (isTreeMixture(params)) {
+        // tree-mixture model
+        if (params.user_file == NULL) {
+            outError("Tree file has to be inputed (using the option -te) for tree-mixture model");
+        }
+        if (params.compute_ml_tree_only) {
+            outError("option compute_ml_tree_only cannot be set for tree-mixture model");
+        }
+        ((IQTreeMix *) iqtree)->init(iqtree->aln, &params, iqtree->getCheckpoint());
+    }
 
     if (posRateHeterotachy(iqtree->aln->model_name) != string::npos && !iqtree->isMixlen()) {
         // create a new instance
@@ -3759,7 +3776,13 @@ void runPhyloAnalysis(Params &params, Checkpoint *checkpoint) {
     }
 
     /*************** initialize tree ********************/
-    IQTree *tree = newIQTree(params, alignment);
+    IQTree *tree;
+    if (isTreeMixture(params)) {
+        cout << "Tree-mixture model" << endl;
+        tree = new IQTreeMix(alignment);
+    } else {
+        tree = newIQTree(params, alignment);
+    }
     
     tree->setCheckpoint(checkpoint);
     if (params.min_branch_length <= 0.0) {

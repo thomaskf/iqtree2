@@ -544,6 +544,63 @@ void IQTree::createPLLPartition(Params &params, ostream &pllPartitionFileHandle)
     }
 }
 
+/**
+ * load the initial tree from the input stream
+ */
+void IQTree::readUserTree(LikelihoodKernel kernel, istream &in) {
+    double start = getRealTime();
+    string initTree;
+    string out_file = params->out_prefix;
+    int score;
+    if (params->stop_condition == SC_FIXED_ITERATION && params->numNNITrees > params->min_iterations)
+        params->numNNITrees = max(params->min_iterations, 1);
+    int fixed_number = 0;
+
+    if (params->sankoff_cost_file && !cost_matrix)
+        loadCostMatrixFile(params->sankoff_cost_file);
+    if (aln->ordered_pattern.empty())
+        aln->orderPatternByNumChars(PAT_VARIANT);
+
+    setParsimonyKernel(kernel);
+
+    // start the search with user-defined tree
+    bool myrooted = params->is_rooted;
+    readTree(in, myrooted);
+    setAlignment(aln);
+    if (isSuperTree())
+        wrapperFixNegativeBranch(params->fixed_branch_length == BRLEN_OPTIMIZE &&
+                                 params->partition_type == BRLEN_OPTIMIZE);
+    else
+        fixed_number = wrapperFixNegativeBranch(false);
+    params->numInitTrees = 1;
+    params->numNNITrees = 1;
+    if (params->pll)
+        pllReadNewick(getTreeString());
+    initTree = getTreeString();
+    CKP_SAVE(initTree);
+    saveCheckpoint();
+
+    if (!constraintTree.isCompatible(this))
+        outError("Initial tree is not compatible with constraint tree");
+
+    if (fixed_number) {
+        cout << "WARNING: " << fixed_number << " undefined/negative branch lengths are initialized with parsimony" << endl;
+    }
+
+    if (params->root) {
+        StrVector outgroup_names;
+        convert_string_vec(params->root, outgroup_names);
+        for (auto it = outgroup_names.begin(); it != outgroup_names.end(); it++)
+            if (aln->getSeqID(*it) < 0)
+                outError("Specified outgroup taxon " + *it + " not found");
+    }
+
+    if (params->write_init_tree) {
+        out_file += ".init_tree";
+        printTree(out_file.c_str(), WT_APPEND);
+    }
+}
+
 void IQTree::computeInitialTree(LikelihoodKernel kernel) {
     double start = getRealTime();
     string initTree;
@@ -2050,7 +2107,6 @@ string IQTree::optimizeModelParameters(bool printInfo, double logl_epsilon) {
     prepareToComputeDistances();
     if (logl_epsilon == -1)
         logl_epsilon = params->modelEps;
-    cout << "Estimate model parameters (epsilon = " << logl_epsilon << ")" << endl;
     double stime = getRealTime();
     string newTree;
     if (params->pll) {
