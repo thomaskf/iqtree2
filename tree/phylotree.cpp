@@ -2678,6 +2678,8 @@ double PhyloTree::optimizeAllBranches(int my_iterations, double tolerance, int m
         cout << "Initial tree log-likelihood: " << tree_lh << endl;
     }
     DoubleVector lenvec;
+    //cout << tree_lh << endl;
+    initProgress(my_iterations*nodes.size(), "Optimizing branch lengths", "", "");
     for (int i = 0; i < my_iterations; i++) {
 //        string string_brlen = getTreeString();
         saveBranchLengths(lenvec);
@@ -2692,7 +2694,20 @@ double PhyloTree::optimizeAllBranches(int my_iterations, double tolerance, int m
                 cout << "Branch " << nodes[j]->id << " " << nodes2[j]->id << ": " << computeLikelihoodFromBuffer() << endl;
                 showProgress();
             }
+            trackProgress(1);
         }
+
+//        if (i == 0) 
+//            optimizeOneBranch((PhyloNode*)nodes[0], (PhyloNode*)nodes2[0]);
+//        if (i % 2 == 0) {
+//            for (int j = 1; j < nodes.size(); j++)
+//                optimizeOneBranch((PhyloNode*)nodes[j], (PhyloNode*)nodes2[j]);
+//        } else {
+//            for (int j = nodes.size()-2; j >= 0; j--)
+//                optimizeOneBranch((PhyloNode*)nodes[j], (PhyloNode*)nodes2[j]);
+//        }
+
+//            optimizeAllBranches((PhyloNode*) root, NULL, maxNRStep);
             
         double new_tree_lh = computeLikelihoodFromBuffer();
         //cout<<"After opt  log-lh = "<<new_tree_lh<<endl;
@@ -2703,6 +2718,18 @@ double PhyloTree::optimizeAllBranches(int my_iterations, double tolerance, int m
             cout << new_tree_lh << endl;
             showProgress();
         }
+
+//        if (verbose_mode >= VB_DEBUG) {
+//            printTree(cout, WT_BR_LEN+WT_NEWLINE);
+//        }
+
+//        if (new_tree_lh < tree_lh - 10.0) { // make sure that the new tree likelihood never decreases too much
+//            cout << "ERROR: Branch length optimization failed as log-likelihood decreases too much: " << tree_lh << "  --> " << new_tree_lh << endl;
+//            getModel()->writeInfo(cout);
+//            getRate()->writeInfo(cout);
+//            assert(new_tree_lh >= tree_lh - 10.0);
+//        }
+        
 
         if (new_tree_lh < tree_lh - tolerance*0.1) {
             // IN RARE CASE: tree log-likelihood decreases, revert the branch length and stop
@@ -2716,6 +2743,8 @@ double PhyloTree::optimizeAllBranches(int my_iterations, double tolerance, int m
             clearAllPartialLH();
             restoreBranchLengths(lenvec);
 
+            //clearAllPartialLH();
+//            readTreeString(string_brlen);
             double max_delta_lh = 1.0;
             // Increase max delta with PoMo because log likelihood is very much lower.
             if (aln->seq_type == SEQ_POMO) max_delta_lh = 3.0;
@@ -2727,19 +2756,21 @@ double PhyloTree::optimizeAllBranches(int my_iterations, double tolerance, int m
                 cout << "new_tree_lh: " << new_tree_lh << "   tree_lh: " << tree_lh << endl;
                 showProgress();
             }
+            doneProgress();
             ASSERT(fabs(new_tree_lh-tree_lh) < max_delta_lh);
             return new_tree_lh;
         }
 
-        // only return if the new_tree_lh >= tree_lh!
-        // (in rare case that likelihood decreases, continue the loop)
+        // only return if the new_tree_lh >= tree_lh! (in rare case that likelihood decreases, continue the loop)
         if (tree_lh <= new_tree_lh && new_tree_lh <= tree_lh + tolerance) {
             curScore = new_tree_lh;
+            doneProgress();
             return new_tree_lh;
         }
         tree_lh = new_tree_lh;
     }
     curScore = tree_lh;
+    doneProgress();
     return tree_lh;
 }
 
@@ -3958,12 +3989,13 @@ NNIMove PhyloTree::getBestNNIForBran(PhyloNode *node1, PhyloNode *node2, NNIMove
 
     //NNIMove nniMoves[2];
     bool newNNIMoves = false;
-    if (nniMoves==nullptr) {
+    if (!nniMoves) {
         //   Initialize the 2 NNI moves
         newNNIMoves = true;
         nniMoves = new NNIMove[2];
         nniMoves[0].ptnlh = nniMoves[1].ptnlh = NULL;
         nniMoves[0].node1 = NULL;
+
     }
 
     if (nniMoves[0].node1) {
@@ -4123,9 +4155,7 @@ NNIMove PhyloTree::getBestNNIForBran(PhyloNode *node1, PhyloNode *node2, NNIMove
      } else {
          res = nniMoves[1];
      }
-    if (newNNIMoves) {
-        delete [] nniMoves;
-    }
+    delete [] nniMoves;
     return res;
 }
 
